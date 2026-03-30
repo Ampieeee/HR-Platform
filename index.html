@@ -867,12 +867,20 @@ tbody tr:hover td { background: var(--line2); }
     <div class="fgrid">
       <div class="ff" style="grid-column:1/-1"><label>คู่ Mentor → Mentee</label><select id="bgt-pair"></select></div>
       <div class="ff"><label>จำนวนเงิน (฿)</label><input type="number" id="bgt-amt" placeholder="0" min="1"></div>
-      <div class="ff"><label>วันที่</label><input type="date" id="bgt-date"></div>
-      <div class="ff" style="grid-column:1/-1"><label>รายละเอียด</label><input id="bgt-note" placeholder="เช่น อาหารกลางวัน, Workshop"></div>
+      <div class="ff"><label>วันที่ <span style="font-weight:400;color:var(--ink3)">(ถ้าจำไม่ได้ว่างไว้ได้)</span></label><input type="date" id="bgt-date"></div>
+      <div class="ff"><label>หมวดหมู่</label>
+        <select id="bgt-cat">
+          <option value="Food">🍽 Food</option>
+          <option value="Activities">🎯 Activities</option>
+          <option value="Entertainment">🎉 Entertainment</option>
+          <option value="Gift">🎁 Gift</option>
+        </select>
+      </div>
+      <div class="ff"><label>รายละเอียดเพิ่มเติม <span style="font-weight:400;color:var(--ink3)">(ไม่บังคับ)</span></label><input id="bgt-note" placeholder="เช่น ร้าน, งาน, ชื่อของขวัญ"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeM('m-bgt')">ยกเลิก</button>
-      <button class="btn btn-sage" onclick="saveBgt()">บันทึก</button>
+      <button class="btn btn-sage" id="bgt-save-btn" onclick="saveBgt()">บันทึก</button>
     </div>
   </div>
 </div>
@@ -895,7 +903,7 @@ tbody tr:hover td { background: var(--line2); }
 // ============================================================
 
 // ▼▼▼ ใส่ URL ของ Apps Script Web App ที่ deploy แล้วตรงนี้ ▼▼▼
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxeGYrBd1S9-yxiuVqT3LOk4qajkZrOJhsqnzQ7vqLzh82FJe2LRJIqrGKJE2DgzKg/exec';
 // ▲▲▲ ตัวอย่าง: 'https://script.google.com/macros/s/AKfy.../exec' ▲▲▲
 
 // ============================================================
@@ -909,13 +917,14 @@ let PROB_D = 119, BUDGET = 3000, PAY_D = 28, NOTICE = 30;
 // BOOTSTRAP — fetch data then render auth
 // ============================================================
 async function bootstrap() {
-  const isConfigured = APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE';
+  const isConfigured = APPS_SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec';
 
   if (!isConfigured) {
     showLoadError(
       'ยังไม่ได้ตั้งค่า Apps Script URL',
       `เปิดไฟล์ <code>hr-platform.html</code> แล้วแก้บรรทัด<br>
-       <code>const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE'</code><br>
+       <code>const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec
+       '</code><br>
        ให้เป็น URL จริงของ Apps Script Web App ที่ deploy แล้ว`
     );
     return;
@@ -923,7 +932,7 @@ async function bootstrap() {
 
   try {
     setLoadTxt('กำลังเชื่อมต่อ Google Sheet...');
-    const res = await fetch(APPS_SCRIPT_URL + '?action=all');
+    const res = await fetch(APPS_SCRIPT_URL);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'load failed');
@@ -934,7 +943,7 @@ async function bootstrap() {
     SUPV_DATA   = data.supervisors || [];  // Supervisor sheet (หัวหน้าโดยตรง)
     MENTOR_DATA = data.mentors;
     PAIRS       = data.pairs;
-    HR_PWD      = String(data.config.HR_PASSWORD || '').trim();
+    HR_PWD      = [data.config.HR_PASSWORD];
     PROB_D      = data.config.PROB_DAYS;
     BUDGET      = data.config.BUDGET;
     PAY_D       = data.config.PAYROLL_DAY;
@@ -1023,7 +1032,7 @@ function doLogin() {
   if (!v) return;
 
   // HR
-  if (HR_PWD && v === HR_PWD) {
+  if (HR_PWD.includes(v)) {
     role = 'hr'; user = {id:'HR', name:'HR Admin', nick:'HR'}; return go();
   }
   // Manager (หัวหน้าระดับส่วน — เลือกพี่เลี้ยง)
@@ -1052,10 +1061,10 @@ function go() {
     chip.className = 'role-chip chip-hr'; lbl.textContent = 'HR'; ul.textContent = 'HR Admin';
   } else if (role === 'manager') {
     chip.className = 'role-chip chip-mgr'; lbl.textContent = 'Manager (เลือกพี่เลี้ยง)';
-    ul.textContent = user.name;
+    ul.textContent = user.fname + ' ' + user.lname;
   } else if (role === 'supervisor') {
     chip.className = 'role-chip chip-mgr'; lbl.textContent = 'Supervisor (หัวหน้าโดยตรง)';
-    ul.textContent = user.name;
+    ul.textContent = user.fname + ' ' + user.lname;
   } else {
     chip.className = 'role-chip chip-mtor'; lbl.textContent = 'Mentor';
     ul.textContent = user.name;
@@ -1182,7 +1191,7 @@ function probCard(emp, viewRole) {
   <div class="pcard ${done ? 'done' : ''}">
     <div class="pc-top">
       <div>
-        <div class="pc-name">${emp.name}<span class="nick">(${emp.nick})</span></div>
+        <div class="pc-name">${emp.fname} ${emp.lname}<span class="nick">(${emp.nick})</span></div>
         <div class="pc-meta">${emp.dept} · ${emp.section} · ${emp.unit}</div>
         <div class="pc-meta" style="font-size:12px;color:var(--ink3);margin-top:1px">${emp.pos}</div>
         <div class="pc-id">${emp.id}</div>
@@ -1314,7 +1323,7 @@ function renderBgtTab() {
     const m = MENTOR_DATA.find(x => x.id === p.mId);
     const e = EMP_DATA.find(x => x.id === p.eeId);
     const left = BUDGET - p.used;
-    return `<option value="${p.mId}__${p.eeId}">${e?.name||p.eeId} → ${m?.name||p.mId} (คงเหลือ ฿${left.toLocaleString()})</option>`;
+    return `<option value="${p.mId}__${p.eeId}">${e?.fname||p.eeId} ${e?.lname||''} → ${m?.name||p.mId} (คงเหลือ ฿${left.toLocaleString()})</option>`;
   }).join('') || '<option value="">ไม่มีคู่ที่ active</option>';
   document.getElementById('bgt-date').value = new Date().toISOString().split('T')[0];
 
@@ -1336,7 +1345,7 @@ function renderBgtTab() {
           const col    = !isActive||isDone ? 'var(--ink3)' : pct>80 ? 'var(--red)' : pct>50 ? 'var(--amber)' : 'var(--sage)';
           return `<tr style="${!isActive?'opacity:0.55':''}">
             <td><div style="font-weight:600;font-size:14px">${m?.name||'?'}</div><div style="font-size:12px;color:var(--ink3)">${m?.nick||''}</div></td>
-            <td><div style="font-weight:500">${e?.name||'?'}</div></td>
+            <td><div style="font-weight:500">${e?.fname||'?'} ${e?.lname||''}</div></td>
             <td>
               ${isActive && !isDone
                 ? '<span class="badge b-sage">คู่ปัจจุบัน</span>'
@@ -1374,14 +1383,14 @@ function renderAllTab() {
             const mgr = MGR_DATA.find(m => m.id === e.mgrId);
             return `<tr>
               <td class="mono" style="font-size:12px">${e.id}</td>
-              <td><strong>${e.name}</strong><br><span style="font-size:12px;color:var(--ink3)">${e.nick}</span></td>
+              <td><strong>${e.fname} ${e.lname}</strong><br><span style="font-size:12px;color:var(--ink3)">${e.nick}</span></td>
               <td>
                 <div style="font-size:13px;font-weight:600">${e.dept}</div>
                 <div style="font-size:12px;color:var(--ink3)">${e.section} · ${e.unit}</div>
               </td>
               <td style="font-size:13px">${e.pos}</td>
               <td class="mono" style="font-size:12px">${e.startDate}</td>
-              <td style="font-size:13px">${mgr ? mgr.name : e.mgrId}</td>
+              <td style="font-size:13px">${mgr ? mgr.fname+' '+mgr.lname : e.mgrId}</td>
             </tr>`;
           }).join('')}
           </tbody>
@@ -1409,7 +1418,7 @@ function renderMgr() {
 
   let html = `
     <div class="page-hero">
-      <h1>${user.name}</h1>
+      <h1>${user.fname} ${user.lname}</h1>
       <p>ฝ่าย ${dept} · ส่วน ${sec} · น้องใหม่ในส่วนของคุณ</p>
     </div>`;
 
@@ -1452,7 +1461,7 @@ function openAssign(empId) {
   // budget สะสมทั้งหมดที่น้องคนนี้ใช้ไปแล้ว (รวมทุก pair เก่า)
   const totalUsedByMentee = PAIRS.filter(p => p.eeId === empId).reduce((s,p) => s+p.used, 0);
 
-  document.getElementById('assign-title').textContent = `เลือกพี่เลี้ยงให้ ${emp.name} (${emp.nick})`;
+  document.getElementById('assign-title').textContent = `เลือกพี่เลี้ยงให้ ${emp.fname} (${emp.nick})`;
   document.getElementById('assign-sub').innerHTML =
     `ฝ่าย ${emp.dept} · ส่วน ${emp.section} · ${emp.unit} · แสดงพี่เลี้ยงในฝ่ายเดียวกันก่อน`
     + (existingMentor ? `
@@ -1577,7 +1586,7 @@ function renderSupervisor() {
 
   let html = `
     <div class="page-hero">
-      <h1>${user.name}</h1>
+      <h1>${user.fname} ${user.lname}</h1>
       <p>หัวหน้าโดยตรง · ฝ่าย ${user.dept} · ส่วน ${user.section} · น้องในความดูแล ${myEmps.length} คน</p>
     </div>`;
 
@@ -1683,7 +1692,7 @@ function renderMentor() {
     return `<div class="card ${done?'done':''}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
         <div>
-          <div style="font-size:16px;font-weight:700">${e.name}
+          <div style="font-size:16px;font-weight:700">${e.fname} ${e.lname}
             <span style="font-size:13px;font-weight:400;color:var(--ink2)">(${e.nick})</span>
           </div>
           <div style="font-size:13px;color:var(--ink2);margin-top:2px">${e.dept} · ${e.section} · ${e.unit}</div>
@@ -1724,9 +1733,13 @@ function renderMentor() {
 async function saveBgt() {
   const sel = document.getElementById('bgt-pair').value;
   const amt = Number(document.getElementById('bgt-amt').value);
+  const cat = document.getElementById('bgt-cat').value;
   const nte = document.getElementById('bgt-note').value.trim();
-  const dt  = document.getElementById('bgt-date').value;
-  if (!sel || !amt || amt <= 0) { alert('กรุณากรอกข้อมูลให้ครบ'); return; }
+  const dt  = document.getElementById('bgt-date').value || '';  // ว่างได้
+  // รวม note = "หมวด: รายละเอียด" หรือแค่หมวดถ้าไม่มีรายละเอียด
+  const fullNote = nte ? `${cat}: ${nte}` : cat;
+
+  if (!sel || !amt || amt <= 0) { alert('กรุณากรอกคู่และจำนวนเงิน'); return; }
 
   const [mId, eeId] = sel.split('__');
   const pair = PAIRS.find(p => p.mId === mId && p.eeId === eeId);
@@ -1737,13 +1750,14 @@ async function saveBgt() {
   btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
 
   try {
-    const res = await apiPost({ action: 'recordBudget', menteeId: eeId, mentorId: mId, date: dt, amount: amt, note: nte });
+    const res = await apiPost({ action: 'recordBudget', menteeId: eeId, mentorId: mId, date: dt, amount: amt, note: fullNote });
     if (!res.ok) throw new Error(res.error);
     pair.used += amt;
-    pair.txns.push({ d: dt, a: amt, n: nte });
+    pair.txns.push({ d: dt || '—', a: amt, n: fullNote });
     closeM('m-bgt');
     document.getElementById('bgt-amt').value  = '';
     document.getElementById('bgt-note').value = '';
+    document.getElementById('bgt-cat').value  = 'Food';
     if (role === 'hr') renderBgtTab();
     else renderMentor();
   } catch (err) {
@@ -1760,7 +1774,7 @@ function showBgt(mId, eeId) {
   if (!p) return;
   const left = BUDGET - p.used;
   showInfo(
-    `Budget: ${m?.name||mId} → ${e?.name||eeId}`,
+    `Budget: ${m?.name||mId} → ${e?.fname||eeId}`,
     `<div style="margin-bottom:14px">
       <span style="font-family:var(--mono);font-size:22px;font-weight:700;color:${left<500?'var(--red)':left<1500?'var(--amber)':'var(--sage)'}">฿${left.toLocaleString()}</span>
       <span style="color:var(--ink3);font-size:13px"> คงเหลือ จาก ฿${BUDGET.toLocaleString()}</span>
@@ -1781,10 +1795,10 @@ function remindOne(empId) {
   const mgr = MGR_DATA.find(m => m.id === emp.mgrId);
   const {dl} = calcProb(emp.startDate);
   const to   = mgr?.email || '';
-  const subj = encodeURIComponent(`[HR Reminder] แจ้งผล Probation — ${emp.name}`);
+  const subj = encodeURIComponent(`[HR Reminder] แจ้งผล Probation — ${emp.fname} ${emp.lname}`);
   const body = encodeURIComponent(
-    `เรียน คุณ${mgr?.name||'หัวหน้า'}\n\n` +
-    `กรุณาแจ้งผลการทดลองงานของ ${emp.name} (${emp.nick})\n` +
+    `เรียน คุณ${mgr?.fname||'หัวหน้า'}\n\n` +
+    `กรุณาแจ้งผลการทดลองงานของ ${emp.fname} ${emp.lname} (${emp.nick})\n` +
     `ฝ่าย ${emp.dept} · ส่วน ${emp.section} · ${emp.unit}\n` +
     `ภายในวันที่ ${fmtD(dl)}\n\nขอบคุณค่ะ / HR`
   );
