@@ -903,13 +903,13 @@ let PROB_D = 119, BUDGET = 3000, PAY_D = 28, NOTICE = 30;
 // BOOTSTRAP — fetch data then render auth
 // ============================================================
 async function bootstrap() {
-  const isConfigured = APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE';
+  const isConfigured = APPS_SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec';
 
   if (!isConfigured) {
     showLoadError(
       'ยังไม่ได้ตั้งค่า Apps Script URL',
       `เปิดไฟล์ <code>hr-platform.html</code> แล้วแก้บรรทัด<br>
-       <code>const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE'</code><br>
+       <code>const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec'</code><br>
        ให้เป็น URL จริงของ Apps Script Web App ที่ deploy แล้ว`
     );
     return;
