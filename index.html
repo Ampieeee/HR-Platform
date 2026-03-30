@@ -798,17 +798,23 @@ tbody tr:hover td { background: var(--line2); }
     </div>
     <div class="auth-card">
       <div class="auth-title">เข้าสู่ระบบ</div>
-      <div class="auth-sub">กรอกรหัสพนักงาน — ระบบจะรู้จัก role ให้อัตโนมัติ</div>
+      <div class="auth-sub">กรอกรหัสตัวเลขพนักงาน — ระบบจะรู้จัก role ให้อัตโนมัติ<br><span style="font-size:12px;color:var(--ink3)">Mentor / Manager ใช้รหัสจาก Sheet · HR ใช้รหัสที่กำหนดเอง</span></div>
       <div class="input-group">
-        <label>รหัสพนักงาน</label>
+        <label>รหัสพนักงาน (ตัวเลขล้วน)</label>
         <input type="text" id="login-input" class="input-field"
-          placeholder="กรอกรหัสพนักงาน"
+          placeholder="เช่น MGR001, EMP010, hr1234"
           autocomplete="off" spellcheck="false"
           onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <button class="btn-login" onclick="doLogin()">เข้าสู่ระบบ →</button>
       <div class="auth-err" id="login-err">
         <span>⚠</span> ไม่พบรหัสนี้ในระบบ กรุณาตรวจสอบอีกครั้ง
+      </div>
+      <div class="auth-hint">
+        <strong style="color:var(--ink2)">Demo credentials</strong><br>
+        HR: <code>hr1234</code> &nbsp;·&nbsp;
+        หัวหน้า: <code>MGR001</code> <code>MGR002</code> <code>MGR003</code><br>
+        พี่เลี้ยง: <code>EMP010</code> <code>EMP012</code> <code>EMP013</code>
       </div>
     </div>
   </div>
@@ -903,13 +909,13 @@ let PROB_D = 119, BUDGET = 3000, PAY_D = 28, NOTICE = 30;
 // BOOTSTRAP — fetch data then render auth
 // ============================================================
 async function bootstrap() {
-  const isConfigured = APPS_SCRIPT_URL !== 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec';
+  const isConfigured = APPS_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE';
 
   if (!isConfigured) {
     showLoadError(
       'ยังไม่ได้ตั้งค่า Apps Script URL',
       `เปิดไฟล์ <code>hr-platform.html</code> แล้วแก้บรรทัด<br>
-       <code>const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec'</code><br>
+       <code>const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE'</code><br>
        ให้เป็น URL จริงของ Apps Script Web App ที่ deploy แล้ว`
     );
     return;
@@ -928,7 +934,7 @@ async function bootstrap() {
     SUPV_DATA   = data.supervisors || [];  // Supervisor sheet (หัวหน้าโดยตรง)
     MENTOR_DATA = data.mentors;
     PAIRS       = data.pairs;
-    HR_PWD      = String(data.config.HR_PASSWORD || "").trim();
+    HR_PWD      = String(data.config.HR_PASSWORD || '').trim();
     PROB_D      = data.config.PROB_DAYS;
     BUDGET      = data.config.BUDGET;
     PAY_D       = data.config.PAYROLL_DAY;
