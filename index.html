@@ -1471,13 +1471,9 @@ function renderAllTab() {
       }).join('') + '</div>';
   }
 
-  const searchBar = '<div style="margin-bottom:20px">' +
-    '<input id="emp-search" type="text" placeholder="🔍 ค้นหาชื่อ, ชื่อเล่น, รหัส, ฝ่าย..." ' +
-    'style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:12px;font-size:14px;font-family:var(--sans);outline:none;background:var(--card)" ' +
-    'oninput="filterEmps()" onfocus="this.style.borderColor='var(--sage)'" onblur="this.style.borderColor='var(--line)'"> ' +
-    '</div>';
+  const searchBar = '<div style="margin-bottom:20px"><input id="emp-search" type="text" placeholder="🔍 ค้นหาชื่อ, ชื่อเล่น, รหัส, ฝ่าย..." style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:12px;font-size:14px;font-family:var(--sans);outline:none;background:var(--card)" oninput="filterEmps()"></div>';
 
-  document.getElementById('t-all').innerHTML =
+    document.getElementById('t-all').innerHTML =
     '<div class="shdr"><h2>พนักงานทั้งหมดในระบบ</h2></div>' + searchBar +
     '<div id="emp-list">' +
     sdiv('กำลังทดลองงาน', act.length, 'b-amber') + empCards(act) +
