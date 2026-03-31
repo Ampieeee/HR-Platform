@@ -1041,8 +1041,9 @@ function calcProb(startStr) {
   return { start, endP, dl, dLeft, dDL, pct, done };
 }
 
-function statusOf(dDL, done) {
+function statusOf(dDL, done, hrAck) {
   if (done)    return {lbl:'ผ่านทดลองงานแล้ว',        cls:'b-gray',  bar:'pf-gray',  pulse:false};
+  if (dDL < 0 && hrAck) return {lbl:'HR รับทราบแล้ว ✓',        cls:'b-sage',  bar:'pf-sage',  pulse:false};
   if (dDL < 0) return {lbl:'เกินกำหนดแจ้ง HR แล้ว!', cls:'b-red',   bar:'pf-red',   pulse:true};
   if (dDL<=7)  return {lbl:`ด่วน! แจ้งใน ${dDL} วัน`,cls:'b-red',   bar:'pf-red',   pulse:true};
   if (dDL<=21) return {lbl:`แจ้งภายใน ${dDL} วัน`,   cls:'b-amber', bar:'pf-amber', pulse:false};
@@ -1162,7 +1163,7 @@ function deptColor(dept) {
 
 function probCard(emp, viewRole) {
   const {start,endP,dl,dLeft,dDL,pct,done} = calcProb(emp.startDate);
-  const st     = statusOf(dDL, done);
+  const st     = statusOf(dDL, done, emp.hrAcknowledged);
   // รวม budget ที่ใช้ไปทุก pair ของน้องคนนี้
   const allPairs      = PAIRS.filter(p => p.eeId === emp.id);
   const pair          = allPairs[allPairs.length - 1]; // pair ล่าสุด = พี่เลี้ยงคนปัจจุบัน
@@ -1231,7 +1232,7 @@ function probCard(emp, viewRole) {
     </div>`
   : `<div class="mentor-section" style="color:var(--ink3);font-size:13px">${done?'—':'ยังไม่มีพี่เลี้ยง'}</div>`;
 
-  const notified = HR_NOTIFIED.has(emp.id);
+  const notified = HR_NOTIFIED.has(emp.id) || emp.hrAcknowledged;
   const emailBtn = viewRole === 'hr' && !done ? (
     notified
       ? '<span class="badge b-sage" style="font-size:12px">✓ รับทราบแล้ว</span>'
@@ -1761,7 +1762,7 @@ function renderMentor() {
     const left = BUDGET - p.used;
     const pct  = Math.round((p.used / BUDGET) * 100);
     const {endP, dLeft, dDL, done} = calcProb(e.startDate);
-    const st = statusOf(dDL, done);
+    const st = statusOf(dDL, done, e ? e.hrAcknowledged : false);
 
     const budgetBlock = done ? `
       <div style="background:var(--line2);border-radius:12px;padding:16px;margin-bottom:14px;opacity:0.7">
@@ -1927,9 +1928,18 @@ function filterEmps() {
     '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-txt">ไม่พบ "' + q + '"</div></div>';
 }
 
-function markHRNotified(empId) {
+async function markHRNotified(empId) {
   HR_NOTIFIED.add(empId);
+  // อัปเดต local state ทันที
+  const emp = EMP_DATA.find(e => e.id === empId);
+  if (emp) emp.hrAcknowledged = true;
   if (role === 'hr') renderProb();
+  // บันทึกลง Sheet
+  try {
+    await apiPost({ action: 'acknowledgeProb', eeId: empId });
+  } catch(e) {
+    console.log('acknowledge save error:', e);
+  }
 }
 
 function remindOne(empId) {
