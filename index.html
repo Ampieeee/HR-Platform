@@ -787,6 +787,12 @@ tbody tr:hover td { background: var(--line2); }
 <body>
 
 <!-- ======================== AUTH ======================== -->
+<!-- Loading Screen -->
+<div id="loading-screen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#faf8f4;flex-direction:column;gap:16px">
+  <div class="spin"></div>
+  <div class="load-txt" id="load-txt">กำลังโหลดข้อมูล...</div>
+</div>
+
 <div id="auth-screen">
   <div class="auth-wrap">
     <div class="auth-brand">
@@ -910,7 +916,7 @@ async function bootstrap() {
     showLoadError(
       'ยังไม่ได้ตั้งค่า Apps Script URL',
       `เปิดไฟล์ <code>hr-platform.html</code> แล้วแก้บรรทัด<br>
-       <code>APPS_SCRIPT_URL</code><br>
+       <code>const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE'</code><br>
        ให้เป็น URL จริงของ Apps Script Web App ที่ deploy แล้ว`
     );
     return;
