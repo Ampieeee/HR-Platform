@@ -770,6 +770,10 @@ tbody tr:hover td { background: var(--line2); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .load-txt { font-size: 14px; color: var(--ink3); }
+.notif-item { padding:12px 18px;border-bottom:1px solid var(--line2);font-size:13px;transition:background 0.1s; }
+.notif-item:hover { background:var(--line2); }
+.notif-item.unread { background:var(--sage-xlight); }
+.notif-new { display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sage);margin-right:6px;flex-shrink:0; }
 .load-err { background: var(--red-light); border: 1px solid rgba(168,44,44,.2);
   border-radius: 12px; padding: 20px 28px; max-width: 460px; text-align: center; }
 .load-err h3 { color: var(--red); margin-bottom: 8px; font-size: 15px; }
@@ -838,6 +842,20 @@ tbody tr:hover td { background: var(--line2); }
         <span id="role-label"></span>
       </div>
       <span class="tb-user" id="user-label"></span>
+      <!-- Notification Bell (HR only) -->
+      <div id="notif-wrap" style="display:none;position:relative">
+        <button onclick="toggleNotif()" style="position:relative;background:transparent;border:none;cursor:pointer;padding:6px 10px;border-radius:8px;font-size:18px;transition:background 0.15s" onmouseover="this.style.background='var(--line2)'" onmouseout="this.style.background='transparent'">
+          🔔
+          <span id="notif-badge" style="display:none;position:absolute;top:2px;right:2px;background:var(--red);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:var(--mono)"></span>
+        </button>
+        <div id="notif-panel" style="display:none;position:absolute;right:0;top:44px;width:340px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);z-index:200;overflow:hidden">
+          <div style="padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:700;font-size:14px">การเลือกพี่เลี้ยงใหม่</span>
+            <button onclick="markAllRead()" style="font-size:12px;color:var(--sage);background:none;border:none;cursor:pointer;font-family:var(--sans)">อ่านทั้งหมด</button>
+          </div>
+          <div id="notif-list" style="max-height:360px;overflow-y:auto"></div>
+        </div>
+      </div>
       <button class="tb-logout" onclick="logout()">ออกจากระบบ</button>
     </div>
   </div>
@@ -915,8 +933,11 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzTAmQXur041iv
 // STATE
 // ============================================================
 let role = null, user = null, assignEmpId = null, pickedMentorId = null;
-let EMP_DATA = [], MGR_DATA = [], MENTOR_DATA = [], SUPV_DATA = [], PAIRS = [], HR_PWD = [];
+let EMP_DATA = [], MGR_DATA = [], MENTOR_DATA = [], SUPV_DATA = [], PAIRS = [], HR_PWD = '';
 let PROB_D = 119, BUDGET = 3000, PAY_D = 28, NOTICE = 30;
+let HR_EMAIL = '';
+const HR_NOTIFIED = new Set(); // เก็บ emp.id ที่ HR mark รับทราบแล้ว (session only)
+const NOTIF_READ   = new Set(); // notification ที่อ่านแล้ว
 
 // ============================================================
 // BOOTSTRAP — fetch data then render auth
@@ -948,6 +969,8 @@ async function bootstrap() {
     MENTOR_DATA = data.mentors;
     PAIRS       = data.pairs;
     HR_PWD      = String(data.config.HR_PASSWORD || '').trim();
+    HR_EMAIL     = String(data.config.HR_EMAIL || '').trim();
+    // pairs มี assignedAt แล้วจาก Apps Script ใหม่
     PROB_D      = data.config.PROB_DAYS;
     BUDGET      = data.config.BUDGET;
     PAY_D       = data.config.PAYROLL_DAY;
@@ -1080,7 +1103,7 @@ function go() {
   });
   document.getElementById('view-' + role).classList.remove('hidden');
 
-  if      (role === 'hr')         renderHR();
+  if      (role === 'hr')         { renderHR(); renderNotif(); }
   else if (role === 'manager')    renderMgr();
   else if (role === 'supervisor') renderSupervisor();
   else                            renderMentor();
@@ -1117,6 +1140,26 @@ function sdiv(label, count, cls) {
 // ============================================================
 // PROBATION CARD
 // ============================================================
+function deptColor(dept) {
+  const d = (dept || '').toLowerCase();
+  if (d.includes('hr') || d.includes('human')) return '#2d5e45';
+  if (d.includes('digital') || d.includes('it') || d.includes('tech')) return '#1d4e8f';
+  if (d.includes('finance') || d.includes('planning') || d.includes('account')) return '#92500a';
+  if (d.includes('sustain') || d.includes('kubota solution')) return '#2e7d32';
+  if (d.includes('marketing') || d.includes('strategy')) return '#7b1fa2';
+  if (d.includes('service') || d.includes('after')) return '#c62828';
+  if (d.includes('parts') || d.includes('อะไหล่')) return '#e65100';
+  if (d.includes('quality') || d.includes('qc') || d.includes('ตรวจสอบ')) return '#00695c';
+  if (d.includes('distribution') || d.includes('network')) return '#1565c0';
+  if (d.includes('manufacture') || d.includes('production') || d.includes('วิศวกรรมการผลิต')) return '#4e342e';
+  if (d.includes('safety') || d.includes('environment') || d.includes('ความปลอดภัย')) return '#558b2f';
+  if (d.includes('corporate') || d.includes('strategy')) return '#4527a0';
+  const palette = ['#2d5e45','#1d4e8f','#92500a','#7b1fa2','#c62828','#00695c','#e65100','#1565c0'];
+  let hash = 0;
+  for (let i = 0; i < (dept||'').length; i++) hash = (hash * 31 + (dept||'').charCodeAt(i)) & 0xffffffff;
+  return palette[Math.abs(hash) % palette.length];
+}
+
 function probCard(emp, viewRole) {
   const {start,endP,dl,dLeft,dDL,pct,done} = calcProb(emp.startDate);
   const st     = statusOf(dDL, done);
@@ -1158,7 +1201,7 @@ function probCard(emp, viewRole) {
   const mentorSection = mentor ? `
     <div class="mentor-section">
       <div class="mentor-assigned">
-        <div class="mentor-ava">${mentor.nick.charAt(0)}</div>
+        <div class="mentor-ava" style="background:${deptColor(mentor.dept)};border:2px solid rgba(255,255,255,0.8)"></div>
         <div class="mentor-info">
           <div class="mentor-nm">${mentor.name} <span style="font-weight:400;color:var(--ink3);font-size:12px">(${mentor.nick})</span></div>
           <div class="mentor-dp">พี่เลี้ยง · ${mentor.dept} · ${mentor.section}</div>
@@ -1188,8 +1231,13 @@ function probCard(emp, viewRole) {
     </div>`
   : `<div class="mentor-section" style="color:var(--ink3);font-size:13px">${done?'—':'ยังไม่มีพี่เลี้ยง'}</div>`;
 
-  const emailBtn = (viewRole === 'hr' && !done)
-    ? `<button class="btn-email" onclick="remindOne('${emp.id}')">📧 เตือนหัวหน้า</button>` : '';
+  const notified = HR_NOTIFIED.has(emp.id);
+  const emailBtn = viewRole === 'hr' && !done ? (
+    notified
+      ? '<span class="badge b-sage" style="font-size:12px">✓ รับทราบแล้ว</span>'
+      : `<button class="btn-email" onclick="markHRNotified('${emp.id}')">✓ รับทราบ</button>
+         <button class="btn-email" style="background:var(--blue-light);color:var(--blue);margin-left:4px" onclick="remindOne('${emp.id}')">📧 เตือน</button>`
+  ) : '';
 
   return `
   <div class="pcard ${done ? 'done' : ''}">
@@ -1295,7 +1343,7 @@ function renderMentorTab() {
           <tr>
             <td>
               <div style="display:flex;align-items:center;gap:10px">
-                <div style="width:34px;height:34px;border-radius:10px;background:var(--sage-light);color:var(--sage);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${m.nick.charAt(0)}</div>
+                <div style="width:34px;height:34px;border-radius:50%;background:${deptColor(m.dept)};flex-shrink:0"></div>
                 <div>
                   <div style="font-weight:600;font-size:14px">${m.name}</div>
                   <div style="font-size:12px;color:var(--ink3)">${m.nick} · ${m.id}</div>
@@ -1423,10 +1471,17 @@ function renderAllTab() {
       }).join('') + '</div>';
   }
 
+  const searchBar = '<div style="margin-bottom:20px">' +
+    '<input id="emp-search" type="text" placeholder="🔍 ค้นหาชื่อ, ชื่อเล่น, รหัส, ฝ่าย..." ' +
+    'style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:12px;font-size:14px;font-family:var(--sans);outline:none;background:var(--card)" ' +
+    'oninput="filterEmps()" onfocus="this.style.borderColor='var(--sage)'" onblur="this.style.borderColor='var(--line)'"> ' +
+    '</div>';
+
   document.getElementById('t-all').innerHTML =
-    '<div class="shdr"><h2>พนักงานทั้งหมดในระบบ</h2></div>' +
+    '<div class="shdr"><h2>พนักงานทั้งหมดในระบบ</h2></div>' + searchBar +
+    '<div id="emp-list">' +
     sdiv('กำลังทดลองงาน', act.length, 'b-amber') + empCards(act) +
-    (done.length ? sdiv('ครบทดลองงานแล้ว (ประวัติ)', done.length, 'b-gray') + empCards(done) : '');
+    (done.length ? sdiv('ครบทดลองงานแล้ว (ประวัติ)', done.length, 'b-gray') + empCards(done) : '') + '</div>';
 }
 
 
@@ -1509,7 +1564,7 @@ function openAssign(empId) {
     <div class="mcard ${isSame?'same-dept':''} ${current?'picked':''}"
          id="mc-${m.id}" onclick="pickMentor('${m.id}')">
       <div class="mcard-check">${current?'✓':''}</div>
-      <div class="mcard-ava">${m.nick.charAt(0)}</div>
+      <div class="mcard-ava" style="background:${deptColor(m.dept)}"></div>
       <div class="mcard-name">${m.name}</div>
       <div class="mcard-dept">${m.dept} · ${m.section}</div>
       <div class="mcard-stats">
@@ -1583,9 +1638,29 @@ async function confirmAssign() {
         changedAt: new Date().toISOString().split('T')[0]
       });
     }
-    // Update mentorId in EMP_DATA (active mentor)
+    // Update mentorId + assignedAt ใน EMP_DATA
     const emp = EMP_DATA.find(e => e.id === assignEmpId);
-    if (emp) emp.mentorId = pickedMentorId;
+    const now = new Date().toLocaleString('sv').replace('T', ' ').slice(0,19);
+    if (emp) { emp.mentorId = pickedMentorId; emp.assignedAt = now; }
+    // อัปเดต assignedAt ใน PAIRS ด้วย
+    const updatedPair = PAIRS.find(p => p.eeId === assignEmpId && p.mId === pickedMentorId);
+    if (updatedPair) updatedPair.assignedAt = now;
+
+    // แจ้ง HR ทาง mailto
+    const empN   = EMP_DATA.find(e => e.id === assignEmpId);
+    const mtorN  = MENTOR_DATA.find(m => m.id === pickedMentorId);
+    if (HR_EMAIL && empN && mtorN) {
+      const subj = encodeURIComponent('[HR Platform] หัวหน้าเลือกพี่เลี้ยงแล้ว — ' + empN.name);
+      const body = encodeURIComponent(
+        'เรียน HR\n\n' +
+        'หัวหน้า ' + (user.name||'') + ' ได้เลือกพี่เลี้ยงให้น้องใหม่แล้วค่ะ\n\n' +
+        'น้อง: ' + empN.name + ' (' + empN.nick + ') · ' + empN.dept + '\n' +
+        'พี่เลี้ยง: ' + mtorN.name + ' (' + mtorN.nick + ') · ' + mtorN.dept + '\n' +
+        'วันที่: ' + new Date().toLocaleDateString('th-TH') + '\n\n' +
+        'กรุณาตรวจสอบใน HR Platform\n\nขอบคุณค่ะ'
+      );
+      window.open('mailto:' + HR_EMAIL + '?subject=' + subj + '&body=' + body);
+    }
 
     closeM('m-assign');
     if (role === 'manager') renderMgr();
@@ -1812,6 +1887,55 @@ function showBgt(mId, eeId) {
 // ============================================================
 // EMAIL REMINDERS (mailto)
 // ============================================================
+function filterEmps() {
+  const q = (document.getElementById('emp-search')?.value || '').toLowerCase().trim();
+  if (!q) { renderAllTab(); return; }
+  const act  = EMP_DATA.filter(e => !calcProb(e.startDate).done &&
+    (e.name.toLowerCase().includes(q) || e.nick.toLowerCase().includes(q) ||
+     e.id.includes(q) || e.dept.toLowerCase().includes(q) || e.section.toLowerCase().includes(q)));
+  const done = EMP_DATA.filter(e =>  calcProb(e.startDate).done &&
+    (e.name.toLowerCase().includes(q) || e.nick.toLowerCase().includes(q) ||
+     e.id.includes(q) || e.dept.toLowerCase().includes(q) || e.section.toLowerCase().includes(q)));
+  const el = document.getElementById('emp-list');
+  if (!el) return;
+  function empCards(emps) {
+    if (!emps.length) return '';
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;margin-bottom:24px">' +
+      emps.map(e => {
+        const pair = PAIRS.find(p => p.eeId === e.id);
+        const mentor = pair ? MENTOR_DATA.find(m => m.id === pair.mId) : null;
+        const {done: isDone, pct} = calcProb(e.startDate);
+        const initial = (e.name||'?').charAt(0);
+        const bg = deptColor(e.dept);
+        return '<div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow)">' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
+            '<div style="width:44px;height:44px;border-radius:50%;background:' + bg + ';flex-shrink:0"></div>' +
+            '<div style="min-width:0;flex:1">' +
+              '<div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</div>' +
+              '<div style="font-size:12px;color:var(--ink3)">' + e.nick + ' · <span style="font-family:var(--mono)">' + e.id + '</span></div>' +
+            '</div>' +
+            (isDone ? '<span class="badge b-gray" style="font-size:11px;flex-shrink:0">✓ ผ่านแล้ว</span>' : '<span class="badge b-amber" style="font-size:11px;flex-shrink:0">⏳ ทดลองงาน</span>') +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--ink2);margin-bottom:4px"><div style="font-weight:600">' + e.dept + '</div><div style="color:var(--ink3)">' + e.section + (e.unit ? ' · ' + e.unit : '') + '</div></div>' +
+          '<div style="font-size:12px;color:var(--ink3);margin-bottom:10px">' + e.pos + '</div>' +
+          (!isDone ? '<div style="height:4px;background:var(--line2);border-radius:2px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:' + pct + '%;background:var(--sage);border-radius:2px"></div></div>' : '') +
+          '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink3)">' +
+            '<span>เริ่มงาน <strong style="color:var(--ink2);font-family:var(--mono)">' + e.startDate + '</strong></span>' +
+            (mentor ? '<span style="background:var(--sage-light);color:var(--sage);padding:2px 8px;border-radius:20px;font-weight:600">' + mentor.nick + '</span>' : '<span style="color:var(--ink3)">ยังไม่มีพี่เลี้ยง</span>') +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+  }
+  el.innerHTML = (act.length ? sdiv('กำลังทดลองงาน', act.length, 'b-amber') + empCards(act) : '') +
+    (done.length ? sdiv('ครบทดลองงานแล้ว (ประวัติ)', done.length, 'b-gray') + empCards(done) : '') ||
+    '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-txt">ไม่พบ "' + q + '"</div></div>';
+}
+
+function markHRNotified(empId) {
+  HR_NOTIFIED.add(empId);
+  if (role === 'hr') renderProb();
+}
+
 function remindOne(empId) {
   const emp = EMP_DATA.find(e => e.id === empId);
   if (!emp) return;
@@ -1834,6 +1958,94 @@ function remindAll() {
   if (!urgent.length) { alert('ไม่มีพนักงานที่ต้องแจ้งเตือนในขณะนี้'); return; }
   urgent.forEach(e => remindOne(e.id));
 }
+
+// ============================================================
+// NOTIFICATION (HR only)
+// ============================================================
+function renderNotif() {
+  if (role !== 'hr') return;
+  const wrap = document.getElementById('notif-wrap');
+  if (wrap) wrap.style.display = 'flex';
+
+  // หา pairs ที่มี assignedAt ใน 14 วันที่ผ่านมา
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+
+  const newPairs = PAIRS.filter(p => {
+    if (!p.assignedAt) return false;
+    const d = new Date(p.assignedAt.replace(' ', 'T'));
+    return d >= cutoff;
+  }).sort((a, b) => new Date(b.assignedAt.replace(' ','T')) - new Date(a.assignedAt.replace(' ','T')));
+
+  const unread = newPairs.filter(p => !NOTIF_READ.has(p.eeId));
+  const badge  = document.getElementById('notif-badge');
+  if (badge) {
+    if (unread.length > 0) {
+      badge.style.display = 'flex';
+      badge.textContent   = unread.length > 9 ? '9+' : unread.length;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+  if (!newPairs.length) {
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">ไม่มีการเลือกพี่เลี้ยงใน 14 วันที่ผ่านมา</div>';
+    return;
+  }
+
+  list.innerHTML = newPairs.map(p => {
+    const emp    = EMP_DATA.find(e => e.id === p.eeId);
+    const mentor = MENTOR_DATA.find(m => m.id === p.mId);
+    const mgr    = emp ? MGR_DATA.find(m => m.id === emp.mgrId) : null;
+    const isRead = NOTIF_READ.has(p.eeId);
+
+    // คำนวณกี่วันที่แล้ว
+    const assignDate = new Date(p.assignedAt.replace(' ','T'));
+    const diffDays   = Math.floor((new Date() - assignDate) / 86400000);
+    const timeAgo    = diffDays === 0 ? 'วันนี้' : diffDays === 1 ? 'เมื่อวาน' : diffDays + ' วันที่แล้ว';
+
+    return '<div class="notif-item ' + (isRead ? '' : 'unread') + '" onclick="readNotif('' + p.eeId + '')">' +
+      '<div style="display:flex;align-items:flex-start;gap:8px">' +
+        (!isRead ? '<span class="notif-new" style="margin-top:4px"></span>' : '<span style="width:7px;margin-right:6px;flex-shrink:0"></span>') +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:600;margin-bottom:2px">' + (emp ? emp.name : p.eeId) + '</div>' +
+          '<div style="color:var(--ink2)">พี่เลี้ยง: <strong>' + (mentor ? mentor.name : p.mId) + '</strong></div>' +
+          '<div style="color:var(--ink3);margin-top:2px">หัวหน้า: ' + (mgr ? mgr.name : (emp ? emp.mgrId : '')) + '</div>' +
+        '</div>' +
+        '<span style="font-size:11px;color:var(--ink3);white-space:nowrap;margin-top:2px">' + timeAgo + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleNotif() {
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+}
+
+function readNotif(eeId) {
+  NOTIF_READ.add(eeId);
+  renderNotif();
+}
+
+function markAllRead() {
+  PAIRS.forEach(p => { if (p.assignedAt) NOTIF_READ.add(p.eeId); });
+  renderNotif();
+  document.getElementById('notif-panel').style.display = 'none';
+}
+
+// ปิด notif panel เมื่อคลิกนอก
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('notif-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const panel = document.getElementById('notif-panel');
+    if (panel) panel.style.display = 'none';
+  }
+});
 
 // ============================================================
 // START
