@@ -1960,59 +1960,69 @@ function remindAll() {
 // ============================================================
 function renderNotif() {
   if (role !== 'hr') return;
-  const wrap = document.getElementById('notif-wrap');
+  var wrap = document.getElementById('notif-wrap');
   if (wrap) wrap.style.display = 'flex';
 
-  // หา pairs ที่มี assignedAt ใน 14 วันที่ผ่านมา
-  const cutoff = new Date();
+  var cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 14);
 
-  const newPairs = PAIRS.filter(p => {
+  var newPairs = PAIRS.filter(function(p) {
     if (!p.assignedAt) return false;
-    const d = new Date(p.assignedAt.replace(' ', 'T'));
+    var d = new Date(p.assignedAt.replace(' ', 'T'));
     return d >= cutoff;
-  }).sort((a, b) => new Date(b.assignedAt.replace(' ','T')) - new Date(a.assignedAt.replace(' ','T')));
+  }).sort(function(a, b) {
+    return new Date(b.assignedAt.replace(' ','T')) - new Date(a.assignedAt.replace(' ','T'));
+  });
 
-  const unread = newPairs.filter(p => !NOTIF_READ.has(p.eeId));
-  const badge  = document.getElementById('notif-badge');
+  var unread = newPairs.filter(function(p) { return !NOTIF_READ.has(p.eeId); });
+  var badge  = document.getElementById('notif-badge');
   if (badge) {
     if (unread.length > 0) {
       badge.style.display = 'flex';
-      badge.textContent   = unread.length > 9 ? '9+' : unread.length;
+      badge.textContent   = unread.length > 9 ? '9+' : String(unread.length);
     } else {
       badge.style.display = 'none';
     }
   }
 
-  const list = document.getElementById('notif-list');
+  var list = document.getElementById('notif-list');
   if (!list) return;
+
   if (!newPairs.length) {
     list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">ไม่มีการเลือกพี่เลี้ยงใน 14 วันที่ผ่านมา</div>';
     return;
   }
 
-  list.innerHTML = newPairs.map(p => {
-    const emp    = EMP_DATA.find(e => e.id === p.eeId);
-    const mentor = MENTOR_DATA.find(m => m.id === p.mId);
-    const mgr    = emp ? MGR_DATA.find(m => m.id === emp.mgrId) : null;
-    const isRead = NOTIF_READ.has(p.eeId);
+  list.innerHTML = newPairs.map(function(p) {
+    var emp    = EMP_DATA.find(function(e) { return e.id === p.eeId; });
+    var mentor = MENTOR_DATA.find(function(m) { return m.id === p.mId; });
+    var mgr    = emp ? MGR_DATA.find(function(m) { return m.id === emp.mgrId; }) : null;
+    var isRead = NOTIF_READ.has(p.eeId);
 
-    // คำนวณกี่วันที่แล้ว
-    const assignDate = new Date(p.assignedAt.replace(' ','T'));
-    const diffDays   = Math.floor((new Date() - assignDate) / 86400000);
-    const timeAgo    = diffDays === 0 ? 'วันนี้' : diffDays === 1 ? 'เมื่อวาน' : diffDays + ' วันที่แล้ว';
+    var assignDate = new Date(p.assignedAt.replace(' ','T'));
+    var diffDays   = Math.floor((new Date() - assignDate) / 86400000);
+    var timeAgo    = diffDays === 0 ? 'วันนี้' : diffDays === 1 ? 'เมื่อวาน' : diffDays + ' วันที่แล้ว';
 
-    return '<div class="notif-item ' + (isRead ? '' : 'unread') + '" onclick="readNotif('' + p.eeId + '')">' +
-      '<div style="display:flex;align-items:flex-start;gap:8px">' +
-        (!isRead ? '<span class="notif-new" style="margin-top:4px"></span>' : '<span style="width:7px;margin-right:6px;flex-shrink:0"></span>') +
-        '<div style="flex:1;min-width:0">' +
-          '<div style="font-weight:600;margin-bottom:2px">' + (emp ? emp.name : p.eeId) + '</div>' +
-          '<div style="color:var(--ink2)">พี่เลี้ยง: <strong>' + (mentor ? mentor.name : p.mId) + '</strong></div>' +
-          '<div style="color:var(--ink3);margin-top:2px">หัวหน้า: ' + (mgr ? mgr.name : (emp ? emp.mgrId : '')) + '</div>' +
-        '</div>' +
-        '<span style="font-size:11px;color:var(--ink3);white-space:nowrap;margin-top:2px">' + timeAgo + '</span>' +
-      '</div>' +
-    '</div>';
+    var dotHtml  = isRead ? '<span style="width:7px;margin-right:6px;flex-shrink:0;display:inline-block"></span>'
+                          : '<span class="notif-new" style="margin-top:4px;display:inline-block"></span>';
+    var empName  = emp    ? emp.name    : p.eeId;
+    var mtorName = mentor ? mentor.name : p.mId;
+    var mgrName  = mgr   ? mgr.name    : (emp ? emp.mgrId : '');
+    var itemCls  = isRead ? 'notif-item' : 'notif-item unread';
+
+    return [
+      '<div class="' + itemCls + '" onclick="readNotif('' + p.eeId + '')">',
+        '<div style="display:flex;align-items:flex-start;gap:8px">',
+          dotHtml,
+          '<div style="flex:1;min-width:0">',
+            '<div style="font-weight:600;margin-bottom:2px">' + empName + '</div>',
+            '<div style="color:var(--ink2)">พี่เลี้ยง: <strong>' + mtorName + '</strong></div>',
+            '<div style="color:var(--ink3);margin-top:2px">หัวหน้า: ' + mgrName + '</div>',
+          '</div>',
+          '<span style="font-size:11px;color:var(--ink3);white-space:nowrap;margin-top:2px">' + timeAgo + '</span>',
+        '</div>',
+      '</div>'
+    ].join('');
   }).join('');
 }
 
