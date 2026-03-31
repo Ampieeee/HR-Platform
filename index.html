@@ -949,7 +949,7 @@ async function bootstrap() {
     showLoadError(
       'ยังไม่ได้ตั้งค่า Apps Script URL',
       `เปิดไฟล์ <code>hr-platform.html</code> แล้วแก้บรรทัด<br>
-       <code>const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE'</code><br>
+       <code>APPS_SCRIPT_URL</code> ในไฟล์ HTML<br>
        ให้เป็น URL จริงของ Apps Script Web App ที่ deploy แล้ว`
     );
     return;
@@ -2011,7 +2011,7 @@ function renderNotif() {
     var itemCls  = isRead ? 'notif-item' : 'notif-item unread';
 
     return [
-      '<div class="' + itemCls + '" onclick="readNotif('' + p.eeId + '')">',
+      '<div class="' + itemCls + '" onclick="readNotif(\'' + p.eeId + '\')">',
         '<div style="display:flex;align-items:flex-start;gap:8px">',
           dotHtml,
           '<div style="flex:1;min-width:0">',
