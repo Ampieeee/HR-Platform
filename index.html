@@ -923,8 +923,7 @@ async function bootstrap() {
     showLoadError(
       'ยังไม่ได้ตั้งค่า Apps Script URL',
       `เปิดไฟล์ <code>hr-platform.html</code> แล้วแก้บรรทัด<br>
-       <code>const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec
-       '</code><br>
+       <code>const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzTAmQXur041ivSP8sxyOy9YFnVGyo7quoAVRcd76pq0UEeDYoL2Y1nkBF__fZQbjf/exec'</code><br>
        ให้เป็น URL จริงของ Apps Script Web App ที่ deploy แล้ว`
     );
     return;
@@ -1035,15 +1034,13 @@ function doLogin() {
   if (HR_PWD.includes(v)) {
     role = 'hr'; user = {id:'HR', name:'HR Admin', nick:'HR'}; return go();
   }
-  // Manager (หัวหน้าระดับส่วน — เลือกพี่เลี้ยง)
-  const mgr = MGR_DATA.find(m => m.id === v);
-  if (mgr) { role = 'manager'; user = mgr; return go(); }
-  // Supervisor (หัวหน้าโดยตรง — ดู countdown น้องตัวเอง)
-  const supv = SUPV_DATA.find(s => s.id === v);
+  // เปรียบเทียบ String(id) กับ String(v) เสมอ — ป้องกัน number vs string mismatch
+  const mgr  = MGR_DATA.find(m   => String(m.id)   === String(v));
+  if (mgr)  { role = 'manager';    user = mgr;  return go(); }
+  const supv = SUPV_DATA.find(s   => String(s.id)   === String(v));
   if (supv) { role = 'supervisor'; user = supv; return go(); }
-  // Mentor
-  const mtor = MENTOR_DATA.find(m => m.id === v);
-  if (mtor) { role = 'mentor'; user = mtor; return go(); }
+  const mtor = MENTOR_DATA.find(m => String(m.id)   === String(v));
+  if (mtor) { role = 'mentor';     user = mtor; return go(); }
 
   err.classList.add('show');
 }
