@@ -1388,45 +1388,47 @@ function renderBgtTab() {
 function renderAllTab() {
   const act  = EMP_DATA.filter(e => !calcProb(e.startDate).done);
   const done = EMP_DATA.filter(e =>  calcProb(e.startDate).done);
-  const tbl  = (emps, label, cls) => {
+
+  function empCards(emps) {
     if (!emps.length) return '';
-    return sdiv(label, emps.length, cls) + `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:24px">
-        ${emps.map(e => {
-          const mgr    = MGR_DATA.find(m => m.id === e.mgrId);
-          const pair   = PAIRS.find(p => p.eeId === e.id);
-          const mentor = pair ? MENTOR_DATA.find(m => m.id === pair.mId) : null;
-          const {done,pct,dLeft} = calcProb(e.startDate);
-          const initial = (e.name||'?').charAt(0);
-          const colors  = ['#2d5e45','#1d4e8f','#92500a','#6b3fa0','#a82c2c','#0d7a6e'];
-          const bg      = colors[(e.id.charCodeAt(0)||0) % colors.length];
-          return \`<div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow);transition:box-shadow 0.2s" onmouseover="this.style.boxShadow='0 4px 20px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='var(--shadow)'">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-              <div style="width:44px;height:44px;border-radius:12px;background:\${bg};color:#fff;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0">\${initial}</div>
-              <div style="min-width:0;flex:1">
-                <div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\${e.name}</div>
-                <div style="font-size:12px;color:var(--ink3)">\${e.nick} · <span style="font-family:var(--mono)">\${e.id}</span></div>
-              </div>
-              \${done ? '<span class="badge b-gray" style="font-size:11px;flex-shrink:0">✓ ผ่านแล้ว</span>' : '<span class="badge b-amber" style="font-size:11px;flex-shrink:0">⏳ ทดลองงาน</span>'}
-            </div>
-            <div style="font-size:12px;color:var(--ink2);margin-bottom:6px">
-              <div style="font-weight:600;margin-bottom:2px">\${e.dept}</div>
-              <div style="color:var(--ink3)">\${e.section}\${e.unit ? ' · '+e.unit : ''}</div>
-            </div>
-            <div style="font-size:12px;color:var(--ink3);margin-bottom:10px">\${e.pos}</div>
-            \${!done ? \`<div style="height:4px;background:var(--line2);border-radius:2px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:\${pct}%;background:var(--sage);border-radius:2px;transition:width 0.6s"></div></div>\` : ''}
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink3)">
-              <span>เริ่มงาน <strong style="color:var(--ink2);font-family:var(--mono)">\${e.startDate}</strong></span>
-              \${mentor ? \`<span style="background:var(--sage-light);color:var(--sage);padding:2px 8px;border-radius:20px;font-weight:600">\${mentor.nick}</span>\` : '<span style="color:var(--ink3)">ยังไม่มีพี่เลี้ยง</span>'}
-            </div>
-          </div>\`;
-        }).join('')}
-      </div>`;
-  };
-  document.getElementById('t-all').innerHTML = `
-    <div class="shdr"><h2>พนักงานทั้งหมดในระบบ</h2></div>
-    ${tbl(act,'กำลังทดลองงาน','b-amber')}${tbl(done,'ครบทดลองงานแล้ว (ประวัติ)','b-gray')}`;
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;margin-bottom:24px">' +
+      emps.map(e => {
+        const mgr    = MGR_DATA.find(m => m.id === e.mgrId);
+        const pair   = PAIRS.find(p => p.eeId === e.id);
+        const mentor = pair ? MENTOR_DATA.find(m => m.id === pair.mId) : null;
+        const {done: isDone, pct} = calcProb(e.startDate);
+        const initial = (e.name || '?').charAt(0);
+        const palette = ['#2d5e45','#1d4e8f','#92500a','#6b3fa0','#a82c2c','#0d7a6e'];
+        const bg = palette[Number(e.id.slice(-1)) % palette.length];
+        return '<div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow)">' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
+            '<div style="width:44px;height:44px;border-radius:12px;background:' + bg + ';color:#fff;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + initial + '</div>' +
+            '<div style="min-width:0;flex:1">' +
+              '<div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</div>' +
+              '<div style="font-size:12px;color:var(--ink3)">' + e.nick + ' · <span style="font-family:var(--mono)">' + e.id + '</span></div>' +
+            '</div>' +
+            (isDone ? '<span class="badge b-gray" style="font-size:11px;flex-shrink:0">✓ ผ่านแล้ว</span>' : '<span class="badge b-amber" style="font-size:11px;flex-shrink:0">⏳ ทดลองงาน</span>') +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--ink2);margin-bottom:4px">' +
+            '<div style="font-weight:600">' + e.dept + '</div>' +
+            '<div style="color:var(--ink3)">' + e.section + (e.unit ? ' · ' + e.unit : '') + '</div>' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--ink3);margin-bottom:10px">' + e.pos + '</div>' +
+          (!isDone ? '<div style="height:4px;background:var(--line2);border-radius:2px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:' + pct + '%;background:var(--sage);border-radius:2px"></div></div>' : '') +
+          '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink3)">' +
+            '<span>เริ่มงาน <strong style="color:var(--ink2);font-family:var(--mono)">' + e.startDate + '</strong></span>' +
+            (mentor ? '<span style="background:var(--sage-light);color:var(--sage);padding:2px 8px;border-radius:20px;font-weight:600">' + mentor.nick + '</span>' : '<span style="color:var(--ink3)">ยังไม่มีพี่เลี้ยง</span>') +
+          '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+  }
+
+  document.getElementById('t-all').innerHTML =
+    '<div class="shdr"><h2>พนักงานทั้งหมดในระบบ</h2></div>' +
+    sdiv('กำลังทดลองงาน', act.length, 'b-amber') + empCards(act) +
+    (done.length ? sdiv('ครบทดลองงานแล้ว (ประวัติ)', done.length, 'b-gray') + empCards(done) : '');
 }
+
 
 // ============================================================
 // MANAGER VIEW
