@@ -871,13 +871,25 @@ tbody tr:hover td { background: var(--line2); }
 
 <!-- Assign Mentor Modal -->
 <div class="modal-overlay" id="m-assign">
-  <div class="modal modal-wide">
-    <div class="modal-title" id="assign-title">เลือกพี่เลี้ยง</div>
-    <div class="modal-sub" id="assign-sub"></div>
-    <div id="assign-body"></div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeM('m-assign')">ยกเลิก</button>
-      <button class="btn btn-sage" onclick="confirmAssign()">✓ ยืนยันการเลือก</button>
+  <div class="modal modal-wide" style="display:flex;flex-direction:column;max-height:90vh;padding:0;overflow:hidden">
+    <!-- Header sticky -->
+    <div style="padding:24px 28px 16px;border-bottom:1px solid var(--line);flex-shrink:0">
+      <div class="modal-title" id="assign-title">เลือกพี่เลี้ยง</div>
+      <div class="modal-sub" id="assign-sub" style="margin-bottom:14px"></div>
+      <!-- Search bar -->
+      <input id="mentor-search" type="text" placeholder="🔍 ค้นหาชื่อ, ชื่อเล่น, ฝ่าย..."
+        oninput="filterMentors()"
+        style="width:100%;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;font-family:var(--sans);outline:none;background:var(--line2)">
+    </div>
+    <!-- Scrollable mentor list -->
+    <div id="assign-body" style="flex:1;overflow-y:auto;padding:16px 28px"></div>
+    <!-- Footer sticky — ปุ่มยืนยันอยู่ด้านล่างแต่ไม่หาย -->
+    <div style="padding:16px 28px;border-top:1px solid var(--line);background:var(--card);flex-shrink:0;display:flex;justify-content:space-between;align-items:center">
+      <div id="assign-picked-label" style="font-size:13px;color:var(--ink3)">ยังไม่ได้เลือกพี่เลี้ยง</div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-outline" onclick="closeM('m-assign')">ยกเลิก</button>
+        <button class="btn btn-sage" id="btn-confirm-assign" onclick="confirmAssign()">✓ ยืนยันการเลือก</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1527,6 +1539,61 @@ function renderMgr() {
 // ============================================================
 // ASSIGN MENTOR — น้อง: กรองตาม section | พี่เลี้ยง: กรองตาม dept (ฝ่าย)
 // ============================================================
+function filterMentors() {
+  const q = (document.getElementById('mentor-search')?.value || '').toLowerCase().trim();
+  const emp = EMP_DATA.find(e => e.id === assignEmpId);
+  if (!emp) return;
+
+  const sameDept  = MENTOR_DATA.filter(m => m.active && m.dept === emp.dept);
+  const otherDept = MENTOR_DATA.filter(m => m.active && m.dept !== emp.dept);
+
+  function filterList(list) {
+    if (!q) return list;
+    return list.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      m.nick.toLowerCase().includes(q) ||
+      m.dept.toLowerCase().includes(q) ||
+      m.section.toLowerCase().includes(q)
+    );
+  }
+
+  const filteredSame  = filterList(sameDept);
+  const filteredOther = filterList(otherDept);
+
+  const mcard = (m, isSame) => {
+    const actN    = PAIRS.filter(p => p.mId === m.id && EMP_DATA.find(e => e.id === p.eeId)?.isProb).length;
+    const totN    = PAIRS.filter(p => p.mId === m.id).length;
+    const current = PAIRS.find(p => p.eeId === assignEmpId)?.mId === m.id;
+    const isPicked = pickedMentorId === m.id;
+    return `<div class="mcard ${isSame?'same-dept':''} ${isPicked||current?'picked':''}"
+         id="mc-${m.id}" onclick="pickMentor('${m.id}')">
+      <div class="mcard-check">${isPicked||current?'✓':''}</div>
+      <div class="mcard-ava" style="background:${deptColor(m.dept)}"></div>
+      <div class="mcard-name">${m.name}</div>
+      <div class="mcard-dept">${m.dept} · ${m.section}</div>
+      <div class="mcard-stats">
+        <span class="mcard-stat ${actN>=2?'ms-active':'ms-ok'}">ดูแลอยู่ ${actN} คน</span>
+        <span class="mcard-stat ms-total">ทั้งหมด ${totN} คน</span>
+      </div>
+    </div>`;
+  };
+
+  let html = '';
+  if (q && filteredSame.length === 0 && filteredOther.length === 0) {
+    html = '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-txt">ไม่พบพี่เลี้ยงที่ค้นหา</div></div>';
+  } else {
+    if (filteredSame.length) {
+      html += `<div class="picker-section-label">✦ ฝ่ายเดียวกัน — ${emp.dept}</div>`;
+      html += `<div class="mentor-grid">${filteredSame.map(m => mcard(m,true)).join('')}</div>`;
+    }
+    if (filteredOther.length) {
+      html += `<div class="picker-section-label">ฝ่ายอื่น</div>`;
+      html += `<div class="mentor-grid">${filteredOther.map(m => mcard(m,false)).join('')}</div>`;
+    }
+  }
+  document.getElementById('assign-body').innerHTML = html;
+}
+
 function openAssign(empId) {
   assignEmpId   = empId;
   pickedMentorId = null;
@@ -1590,6 +1657,19 @@ function openAssign(empId) {
   }
 
   document.getElementById('assign-body').innerHTML = html;
+  // reset search
+  const searchEl = document.getElementById('mentor-search');
+  if (searchEl) searchEl.value = '';
+  // reset picked label
+  const lbl = document.getElementById('assign-picked-label');
+  if (lbl) {
+    if (existingPair) {
+      const em = MENTOR_DATA.find(m => m.id === existingPair.mId);
+      lbl.innerHTML = em ? '<span style="color:var(--sage);font-weight:600">✓ เลือก ' + em.name + ' (' + em.nick + ')</span>' : 'ยังไม่ได้เลือกพี่เลี้ยง';
+    } else {
+      lbl.textContent = 'ยังไม่ได้เลือกพี่เลี้ยง';
+    }
+  }
   openM('m-assign');
 }
 
@@ -1602,6 +1682,12 @@ function pickMentor(id) {
   el.classList.add('picked');
   el.querySelector('.mcard-check').textContent = '✓';
   pickedMentorId = id;
+  // อัปเดต label ด้านล่าง
+  const m = MENTOR_DATA.find(x => x.id === id);
+  const lbl = document.getElementById('assign-picked-label');
+  if (lbl && m) {
+    lbl.innerHTML = '<span style="color:var(--sage);font-weight:600">✓ เลือก ' + m.name + ' (' + m.nick + ')</span>';
+  }
 }
 
 async function confirmAssign() {
